@@ -6,25 +6,24 @@
 
 #define N 1024
 
-#define CHECK(call)
-{
-    const cudaError_t err = call;
-    if (err != cudaSuccess)
-    {
-        printf("%s in %s at line %d\n", cudaGetErrorString(err), __FILE__, __LINE__);
-        exit(EXIT_FAILURE);
-    }
-}
+##define CHECK(call) \
+{ \
+  const cudaError_t err = call; \
+  if (err != cudaSuccess) { \
+    printf("%s in %s at line %d\n", cudaGetErrorString(err), __FILE__, __LINE__); \
+    exit(EXIT_FAILURE); \
+  } \
+} \
 
-#define CHECK_KERNEL()
-{
-    const cudaError_t err = cudaGetLastError();
-    if (err != cudaSuccess)
-    {
-        printf("%s in %s at line %d\n", cudaGetErrorString(err), __FILE__, __LINE__);
-        exit(EXIT_FAILURE);
-    }
-}
+
+#define CHECK_KERNEL() \
+{ \
+  const cudaError_t err = cudaGetLastError();\
+  if (err != cudaSuccess) {\
+    printf("%s in %s at line %d\n", cudaGetErrorString(err), __FILE__, __LINE__);\
+    exit(EXIT_FAILURE);\
+  }\
+}\
 
 double get_time()
 {
@@ -112,7 +111,7 @@ int main(int argc, char* argv[]){
     printf("GPU time: %lf\n", gpu_time);
     printf("CPU_time: %lf\n", cpu_time);
 
-    check(cudaFree(d_input));
-    check(cudaFree(d_sum));
+    CHECK(cudaFree(d_input));
+    CHECK(cudaFree(d_sum));
     return 0;
 }
