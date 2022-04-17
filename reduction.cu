@@ -6,7 +6,7 @@
 
 #define N 1024
 
-##define CHECK(call) \
+#define CHECK(call) \
 { \
   const cudaError_t err = call; \
   if (err != cudaSuccess) { \
