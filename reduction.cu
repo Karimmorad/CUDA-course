@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <sys/time.h>
 
-#define N 1024
+#define N 2048
 
 #define CHECK(call) \
 { \
@@ -90,7 +90,7 @@ int main(int argc, char* argv[]){
     end_gpu = get_time();
 
     //moving data from gpu to cpu
-    CHECK(cudaMemcpy(h_sum_gpu, d_sum, 1*sizeof(float),
+    CHECK(cudaMemcpy(h_sum_gpu, d_sum, length*sizeof(float),
                         cudaMemcpyDeviceToHost));
 
 
@@ -99,12 +99,12 @@ int main(int argc, char* argv[]){
         printf("Wrong result on GPU: %f, CPU: %f \n", h_sum_gpu[length-1], h_sum_cpu[length-1]);
         return 1;
     }
-    printf("all results are correct");
+    printf("all results are correct\n");
 
     double gpu_time = 0, cpu_time = 0;
 
     cpu_time = end_cpu - start_cpu;
-    gpu_time = start_gpu - end_gpu;
+    gpu_time = end_gpu - start_gpu;
 
     printf("GPU time: %lf\n", gpu_time);
     printf("CPU_time: %lf\n", cpu_time);
