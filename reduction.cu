@@ -66,7 +66,7 @@ int main(int argc, char* argv[]){
     dim3 blocksPerGrid(N/N, 1, 1)
     dim3 threadsPerBlock(1,1,1)
 
-    # allocation of random numbers between 0-99
+    //allocation of random numbers between 0-99
     for (int i = 0; i < length; i++)
         h_input[i] = rand()%100;
 
@@ -75,22 +75,22 @@ int main(int argc, char* argv[]){
     end_cpu = get_time();
 
 
-    #Allocating in gpu
+    //Allocating in gpu
     CHECK(cudaMalloc(&d_input, length*sizeof(float)));
     CHECK(cudaMalloc(&d_sum, length*sizeof(float)));
 
-    #moving data to gpu
+    //moving data to gpu
     CHECK(cudaMemcpy(d_input, h_input, length*sizeof(float),
                         cudaMemcpyHosttToDevice));
    
-    # gpu kernel execution
+    //gpu kernel execution
     start_gpu = get_time();
     reduction <<<blocksPerGrid, threadsPerBlock>>>(d_input, d_sum, length);
     CHECK_KERNEL()
     CHECK(cudaDeviceSynchornize());
     end_gpu = get_time();
 
-    # moving data from gpu to cpu
+    //moving data from gpu to cpu
     CHECK(cudaMemcpy(h_sum_gpu, d_sum, 1*sizeof(float),
                         cudeaMemcpyDeviceToHost));
 
