@@ -32,12 +32,12 @@ double get_time()
     return tv.tv_sec + tv.tv_usec * 1e-6;
 }
 
-__global__ void reduction_serial(float* d_input, float* d_sum, length){
+__global__ void reduction_serial(float* d_input, float* d_sum, int length){
     d_sum[0] = d_input[0];
     int i;
     for(i = 1; i < length; i++)
     {
-        d_sum[i] = d_sum[i-1] + d_input[i]
+        d_sum[i] = d_sum[i-1] + d_input[i];
     }
 }
 
@@ -46,7 +46,7 @@ void sum_cpu(float *h_input, float* h_sum_cpu, int length){
     int i;
     for (i = 1 ; i < length; i++)
     {
-        h_sum_cpu[i] += h_sum_cpu[i-1] + h_input[i]
+        h_sum_cpu[i] += h_sum_cpu[i-1] + h_input[i];
     }
 }
 
@@ -62,8 +62,8 @@ int main(int argc, char* argv[]){
     float *h_sum_gpu = (float*)malloc(sizeof(float)*length);
     float *h_sum_cpu = (float*)malloc(sizeof(float)*length);
 
-    dim3 blocksPerGrid(N/N, 1, 1)
-    dim3 threadsPerBlock(1,1,1)
+    dim3 blocksPerGrid(N/N, 1, 1);
+    dim3 threadsPerBlock(1,1,1);
 
     //allocation of random numbers between 0-99
     for (int i = 0; i < length; i++)
@@ -80,25 +80,23 @@ int main(int argc, char* argv[]){
 
     //moving data to gpu
     CHECK(cudaMemcpy(d_input, h_input, length*sizeof(float),
-                        cudaMemcpyHosttToDevice));
+                        cudaMemcpyHostToDevice));
    
     //gpu kernel execution
     start_gpu = get_time();
-    reduction <<<blocksPerGrid, threadsPerBlock>>>(d_input, d_sum, length);
+    reduction_serial<<<blocksPerGrid, threadsPerBlock>>>(d_input, d_sum, length);
     CHECK_KERNEL()
-    CHECK(cudaDeviceSynchornize());
+    CHECK(cudaDeviceSynchronize());
     end_gpu = get_time();
 
     //moving data from gpu to cpu
     CHECK(cudaMemcpy(h_sum_gpu, d_sum, 1*sizeof(float),
-                        cudeaMemcpyDeviceToHost));
+                        cudaMemcpyDeviceToHost));
 
 
-    printf("value of sum = %f", &h_sum);
-
-    if(sum_cpu[length-1] != h_sum_gpu[length-1])
+    if(h_sum_cpu[length-1] != h_sum_gpu[length-1])
     {
-        printf("Wrong result on GPU: %f, CPU: %f \n", h_sum_gpu[length-1], sum_cpu[length-1]);
+        printf("Wrong result on GPU: %f, CPU: %f \n", h_sum_gpu[length-1], h_sum_cpu[length-1]);
         return 1;
     }
     printf("all results are correct");
