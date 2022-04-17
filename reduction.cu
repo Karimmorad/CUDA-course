@@ -41,6 +41,16 @@ __global__ void reduction_serial(float* d_input, float* d_sum, int length){
     }
 }
 
+__global__ void reduction_parallel_naive(float* d_input, float* d_sum, int length){
+    unsigned index = blockIdx.x * blockDim.x + threadIdx.x;
+    int stride;
+    for(stride = 0; stride < length; stride++)
+    {
+        if (index >= stride)
+            d_sum[index] += d_input[index - stride];
+    }
+}
+
 void sum_cpu(float *h_input, float* h_sum_cpu, int length){
     h_sum_cpu[0] = h_input[0];
     int i;
@@ -52,6 +62,12 @@ void sum_cpu(float *h_input, float* h_sum_cpu, int length){
 
 int main(int argc, char* argv[]){
     
+    if (argc < 2)
+    {
+        printf("Run using ./exec BLOCKDIM\n");
+    }
+    int BLOCKDIM = atoi(argv[1]);
+
     double start_cpu, end_cpu, start_gpu, end_gpu;
     srand(time(NULL));
     int length = N;
@@ -62,8 +78,10 @@ int main(int argc, char* argv[]){
     float *h_sum_gpu = (float*)malloc(sizeof(float)*length);
     float *h_sum_cpu = (float*)malloc(sizeof(float)*length);
 
-    dim3 blocksPerGrid(N/N, 1, 1);
-    dim3 threadsPerBlock(1,1,1);
+
+
+    dim3 blocksPerGrid((N + BLOCKDIM - 1)/BLOCKDIM, 1, 1);
+    dim3 threadsPerBlock(BLOCKDIM,1,1);
 
     //allocation of random numbers between 0-99
     for (int i = 0; i < length; i++)
@@ -77,6 +95,7 @@ int main(int argc, char* argv[]){
     //Allocating in gpu
     CHECK(cudaMalloc(&d_input, length*sizeof(float)));
     CHECK(cudaMalloc(&d_sum, length*sizeof(float)));
+    CHECK(cudaMemset(d_sum, 0, length));
 
     //moving data to gpu
     CHECK(cudaMemcpy(d_input, h_input, length*sizeof(float),
@@ -84,7 +103,7 @@ int main(int argc, char* argv[]){
    
     //gpu kernel execution
     start_gpu = get_time();
-    reduction_serial<<<blocksPerGrid, threadsPerBlock>>>(d_input, d_sum, length);
+    reduction_parallel_naive<<<blocksPerGrid, threadsPerBlock>>>(d_input, d_sum, length);
     CHECK_KERNEL()
     CHECK(cudaDeviceSynchronize());
     end_gpu = get_time();
