@@ -50,6 +50,74 @@ __global__ void reduction_parallel_naive(float* d_input, float* d_sum, int lengt
             d_sum[index] += d_input[index - stride];
     }
 }
+/*
+* considering a block with 64 threads
+* at iteration 1: 
+* thread 0 sums input[0] to input[32+0] 
+* thread 1 sums input[1] to input[32+1]
+* thread 2 sums input[2] to input[32+2]
+* thread 3 sums input[3] to input[32+3]
+* ...
+* thread 31 sums input[31] to input[32+31]
+* all other threads do nothing
+*
+* at iteration 2: 
+* thread 0 sums input[0] to input[16+0] 
+* thread 1 sums input[1] to input[16+1]
+* thread 2 sums input[2] to input[16+2]
+* thread 3 sums input[3] to input[16+3]
+* ...
+* thread 15 sums input[15] to input[16+15]
+* all other threads do nothing
+*
+* at iteration 3: 
+* thread 0 sums input[0] to input[8+0] 
+* thread 1 sums input[1] to input[8+1]
+* thread 2 sums input[2] to input[8+2]
+* thread 3 sums input[3] to input[8+3]
+* ...
+* thread 7 sums input[15] to input[8+7]
+* all other threads do nothing
+* ...
+* This may kernel may be optimized by defining a grid with a 
+* size equal to a half of the data size
+*/
+__global__ void p_sum_gpu(float *input) // compute a parallel reduction for each gpu block using multiple threads
+{
+    unsigned threadId = threadIdx.x;
+    unsigned index = blockIdx.x * blockDim.x + threadIdx.x;
+
+    for (unsigned i = blockDim.x / 2; i > 0; i >>= 1)
+    {
+        if (threadId < i)
+        {
+            input[index] += input[index + i];
+        }
+        __syncthreads();
+    }
+}
+
+__global__ void collect_res_gpu(float *input, float *p_sum, int numOfBlocks) // compute the final reduction
+{
+    unsigned int threadId = threadIdx.x;
+    unsigned i;
+    for (i = 0; i < numOfBlocks; i += blockDim.x) // collect the result of the various blocks
+    {
+        if ((threadId + i) * blockDim.x < N){
+            p_sum[threadId] += input[(threadId + i) * blockDim.x];
+        }
+        __syncthreads();
+    }
+
+    for (i = blockDim.x / 2; i > 0; i >>= 1) // compute the parallel reduction for the collected data
+    {
+        if (threadId < i)
+        {
+            p_sum[threadId] += p_sum[threadId + i];
+        }
+        __syncthreads();
+    }
+}
 
 void sum_cpu(float *h_input, float* h_sum_cpu, int length){
     h_sum_cpu[0] = h_input[0];
@@ -95,7 +163,7 @@ int main(int argc, char* argv[]){
     //Allocating in gpu
     CHECK(cudaMalloc(&d_input, length*sizeof(float)));
     CHECK(cudaMalloc(&d_sum, length*sizeof(float)));
-    CHECK(cudaMemset(d_sum, 0, length));
+    CHECK(cudaMemset(d_sum, 0, length*sizeof(float)));
 
     //moving data to gpu
     CHECK(cudaMemcpy(d_input, h_input, length*sizeof(float),
@@ -103,8 +171,11 @@ int main(int argc, char* argv[]){
    
     //gpu kernel execution
     start_gpu = get_time();
-    reduction_parallel_naive<<<blocksPerGrid, threadsPerBlock>>>(d_input, d_sum, length);
-    CHECK_KERNEL()
+    p_sum_gpu<<<blocksPerGrid, threadsPerBlock>>>(d_input); // call the reduction for all the blocks
+    CHECK_KERNEL();
+    CHECK(cudaDeviceSynchronize());
+    collect_res_gpu<<<1, threadsPerBlock>>>(d_input, d_sum, blocksPerGrid.x); // finish the results collection using a single block
+    CHECK_KERNEL();
     CHECK(cudaDeviceSynchronize());
     end_gpu = get_time();
 
