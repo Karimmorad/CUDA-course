@@ -62,6 +62,9 @@ __global__ void smithwaterman(char *query_d, char *string_d, int *mat_d, int *re
     int MIN_COL = 0;
 
     for (int i=1; i<S_LEN+S_LEN+1; i++){                //compute antidiags per matrix
+        // instead of iterating every cell,
+        // we can skip every block dimension
+        // and use the threads to calculate each element
         for(int j=1; j<A_LEN; j+=blockDim.x){           //compute the inner for in parallel
             if(j+threadIdx.x<A_LEN){
                 int row, col;
@@ -107,6 +110,9 @@ int main(int argc, char *argv[]){
     //
     int res[N];
 
+
+    // this part is used to flatten the code
+    // we use the same c code that is given and always remember to flatten it
     char alphabet[5] = {'A','C','G','T','N'};
     int mat[S_LEN+1][S_LEN+1];
     for(int n = 0; n < N; n++){
@@ -152,26 +158,30 @@ int main(int argc, char *argv[]){
 
 
     /// GPU
-
+    // declare the amount of matrices we need in the code
     char *query_d, *string_d;
     int *mat_d, *res_d;
 
     int res_gpu[N];
 
+    // 1 - after declaring the matrices, start with allocating the size of each data
     CHECK(cudaMalloc(&query_d, sizeof(char)*N*S_LEN));
     CHECK(cudaMalloc(&string_d, sizeof(char)*N*S_LEN));
     CHECK(cudaMalloc(&mat_d, sizeof(int)*N*(S_LEN+1)*(S_LEN+1)));
     CHECK(cudaMalloc(&res_d, sizeof(int)*N));
 
+    // 2 - copy the host matrices that are needed to use for the calculation
     CHECK(cudaMemcpy(query_d, query_flat, sizeof(char)*N*S_LEN,cudaMemcpyHostToDevice));
     CHECK(cudaMemcpy(string_d, string_flat, sizeof(char)*N*S_LEN,cudaMemcpyHostToDevice));
 
     dim3 blocksPerGrid(N,1,1);
     dim3 threadsPerBlock(numThreads,1,1);
     double start_gpu = get_time();
+    // 5 - call the gpu function and start implementing the function using the sent data
     smithwaterman<<<blocksPerGrid,threadsPerBlock>>>(query_d,string_d,mat_d,res_d,ins,del);
     CHECK_KERNELCALL();
 
+    // 3 - copy data back from the gpu to the cpu
     CHECK(cudaMemcpy(res_gpu, res_d, sizeof(int)*N,cudaMemcpyDeviceToHost));
     double end_gpu = get_time();
 
@@ -186,6 +196,7 @@ int main(int argc, char *argv[]){
     if(test)
         printf("GPU Time: %lf\n", end_gpu-start_gpu);
 
+    // 4 - free all data allocated in the gpu
     CHECK(cudaFree(query_d));
     CHECK(cudaFree(string_d));
     CHECK(cudaFree(mat_d));
