@@ -1,0 +1,37 @@
+// headers
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+#include <sys/time.h>
+
+#define N 1000
+
+// helpful checks for cuda functions and kernel
+#define CHECK(call)                                                                       \
+    {                                                                                     \
+        const cudaError_t err = call;                                                     \
+        if (err != cudaSuccess)                                                           \
+        {                                                                                 \
+            printf("%s in %s at line %d\n", cudaGetErrorString(err), __FILE__, __LINE__); \
+            exit(EXIT_FAILURE);                                                           \
+        }                                                                                 \
+    }
+
+#define CHECK_KERNELCALL()                                                                \
+    {                                                                                     \
+        const cudaError_t err = cudaGetLastError();                                       \
+        if (err != cudaSuccess)                                                           \
+        {                                                                                 \
+            printf("%s in %s at line %d\n", cudaGetErrorString(err), __FILE__, __LINE__); \
+            exit(EXIT_FAILURE);                                                           \
+        }                                                                                 \
+    }
+
+//---------------------------------------------//
+Steps for implementing the code
+// 1 - after declaring the matrices, start with allocating the size of each data
+// 2 - copy the host matrices that are needed to use for the calculation
+// 3 - copy data back from the gpu to the cpu
+// 4 - free all data allocated in the gpu
+// 5 - check if there is a function that can be used by the algorithm --> add __device__ __host__
+// 5 - call the gpu function and start implementing the function using the data sent
