@@ -34,4 +34,46 @@ Steps for implementing the code
 // 3 - copy data back from the gpu to the cpu
 // 4 - free all data allocated in the gpu
 // 5 - check if there is a function that can be used by the algorithm --> add __device__ __host__
-// 5 - call the gpu function and start implementing the function using the data sent
+// 6 - call the gpu function and start implementing the function using the data sent
+
+// added after the kernel launch to block cpu until kernel finishes
+cudaDeviceSynchronize();
+
+// barrier call within the same block, to synchronize threads
+__syncthreads()
+
+
+// The static shared memory allocation inside a kernel function
+__shared__ int sv[N];
+int i = blockIdx.x * blockDim.x +
+        threadIdx.x; sv[i] = a[i];
+__syncthreads(); /*...elaborate...*/ __syncthreads(); b[i] = sv[i];
+
+
+// The dynamic shared memory allocation happens using extern
+extern __shared__ int sv[];
+//....
+//....
+// in the device code we send the sizeof(size_t)*N in the kernel call
+foo<<gdim, bdim, sizeof(int)*N>>(va, vb);
+
+
+
+/// Tiled matrix multiplication code
+__global__ void tiled_matrixmult(int *M, int *N, int *P,
+int numMRows, int numMColumns, int numNColumns) {
+__shared__ int ds_M[BLOCK_WIDTH][BLOCK_WIDTH];
+__shared__ int ds_N[BLOCK_WIDTH][BLOCK_WIDTH];
+int bx = blockIdx.x, by = blockIdx.y, tx = threadIdx.x, ty = threadIdx.y,
+        i = by * BLOCK_WIDTH + ty, j = bx * BLOCK_WIDTH + tx; int Pvalue = 0;
+for (int m = 0; m < (numAColumns - 1) / BLOCK_WIDTH + 1; ++m) {
+    ds_M[ty][tx] = M[i * numNColumns + m * BLOCK_WIDTH + tx];
+    ds_N[ty][tx] = N[(m * BLOCK_WIDTH + ty) * numNColumns + j];
+    __syncthreads();
+    for (int k = 0; k < BLOCK_WIDTH; ++k)
+        Pvalue += ds_M[ty][k] * ds_N[k][tx];
+    __syncthreads();
+    }
+if (i < numMRows && j < numNColumns)
+    P[i * numNColumns + j] = Pvalue;
+}
